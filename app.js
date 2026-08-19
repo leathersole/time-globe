@@ -324,14 +324,28 @@ function updateHeader(now) {
   const pill = document.getElementById('offsetPill');
   const resetBtn = document.getElementById('resetBtn');
   resetBtn.hidden = manualBase === null;
-  if (offsetMinutes === 0) {
+
+  // Show the total offset from the current real time, not just the wheel offset
+  if (manualBase === null) {
     pill.hidden = true;
   } else {
-    const sign = offsetMinutes > 0 ? '+' : '-';
-    const abs = Math.abs(offsetMinutes);
-    const h = Math.floor(abs / 60), m = abs % 60;
-    pill.textContent = `${sign}${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm' : ''}`.trim();
-    pill.hidden = false;
+    const totalDiffMs = now.getTime() - Date.now();
+    const totalDiffMin = Math.round(totalDiffMs / 60000);
+    if (totalDiffMin === 0) {
+      pill.hidden = true;
+    } else {
+      const sign = totalDiffMin > 0 ? '+' : '-';
+      const abs = Math.abs(totalDiffMin);
+      const d = Math.floor(abs / 1440);
+      const h = Math.floor((abs % 1440) / 60);
+      const m = abs % 60;
+      const parts = [];
+      if (d > 0) parts.push(`${d}d`);
+      if (h > 0) parts.push(`${h}h`);
+      if (m > 0 || parts.length === 0) parts.push(`${m}m`);
+      pill.textContent = `${sign}${parts.join(' ')}`;
+      pill.hidden = false;
+    }
   }
 }
 
