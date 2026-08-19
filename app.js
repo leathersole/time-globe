@@ -365,15 +365,21 @@ async function initMap() {
     if (nearest) addCity(nearest);
   });
 
-  const dots = dotsG.selectAll('circle.city-dot')
+  // Each city gets a small visible dot plus a larger invisible circle so the
+  // tap target is comfortable on touch screens without changing the map's look.
+  const dotGroups = dotsG.selectAll('g.city-dot-group')
     .data(CITIES)
-    .join('circle')
-    .attr('class', 'city-dot')
-    .attr('r', 2.6)
-    .attr('cx', d => projection([d.lon, d.lat])[0])
-    .attr('cy', d => projection([d.lon, d.lat])[1])
+    .join('g')
+    .attr('class', 'city-dot-group')
+    .attr('transform', d => {
+      const [x, y] = projection([d.lon, d.lat]);
+      return `translate(${x},${y})`;
+    })
     .on('click', (event, d) => { event.stopPropagation(); addCity(d); });
-  dots.append('title').text(d => `${d.name}, ${d.country}`);
+
+  dotGroups.append('circle').attr('class', 'city-hit').attr('r', 10);
+  const dots = dotGroups.append('circle').attr('class', 'city-dot').attr('r', 2.6);
+  dotGroups.append('title').text(d => `${d.name}, ${d.country}`);
   mapState.dots = dots;
 
   try {
@@ -487,18 +493,71 @@ function normalizedDeltaY(e) {
   return e.deltaY;
 }
 
+function ensureManualBase() {
+  if (manualBase) return;
+  const tenMin = WHEEL_UNIT_MIN * 60000;
+  manualBase = new Date(Math.round(Date.now() / tenMin) * tenMin);
+}
+
+// Consumes an accumulated pixel/wheel delta into whole 10-minute steps,
+// carrying the remainder so partial (e.g. trackpad or slow-drag) input isn't lost.
+function consumeDelta(accum, delta, threshold) {
+  let a = accum + delta;
+  while (a >= threshold) { offsetMinutes += WHEEL_UNIT_MIN; a -= threshold; }
+  while (a <= -threshold) { offsetMinutes -= WHEEL_UNIT_MIN; a += threshold; }
+  return a;
+}
+
 function initWheel() {
   document.getElementById('workspace').addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (!manualBase) {
-      const tenMin = WHEEL_UNIT_MIN * 60000;
-      manualBase = new Date(Math.round(Date.now() / tenMin) * tenMin);
-    }
-    wheelAccum += normalizedDeltaY(e);
-    while (wheelAccum >= WHEEL_THRESHOLD) { offsetMinutes += WHEEL_UNIT_MIN; wheelAccum -= WHEEL_THRESHOLD; }
-    while (wheelAccum <= -WHEEL_THRESHOLD) { offsetMinutes -= WHEEL_UNIT_MIN; wheelAccum += WHEEL_THRESHOLD; }
+    ensureManualBase();
+    wheelAccum = consumeDelta(wheelAccum, normalizedDeltaY(e), WHEEL_THRESHOLD);
     mainTick();
   }, { passive: false });
+}
+
+// Touch equivalent of the wheel: a vertical drag on the map shifts every
+// clock by 10-minute steps. Horizontal drags are left alone (reserved for
+// panning), and the gesture direction is locked in once movement is clear
+// so it never fights with the clock strip's own horizontal touch-scroll.
+const TOUCH_PX_PER_STEP = 40;
+
+function initTouch() {
+  const mapPane = document.getElementById('mapPane');
+  let startX = null, startY = null, lastY = null;
+  let dragging = false, verticalDrag = false;
+  let touchAccum = 0;
+
+  mapPane.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    lastY = startY;
+    dragging = false;
+    verticalDrag = false;
+    touchAccum = 0;
+  }, { passive: true });
+
+  mapPane.addEventListener('touchmove', (e) => {
+    if (startY === null || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    if (!dragging && (Math.abs(x - startX) > 8 || Math.abs(y - startY) > 8)) {
+      dragging = true;
+      verticalDrag = Math.abs(y - startY) > Math.abs(x - startX);
+    }
+    if (dragging && verticalDrag) {
+      e.preventDefault();
+      ensureManualBase();
+      touchAccum = consumeDelta(touchAccum, lastY - y, TOUCH_PX_PER_STEP);
+      lastY = y;
+      mainTick();
+    }
+  }, { passive: false });
+
+  const endTouch = () => { startX = null; startY = null; dragging = false; verticalDrag = false; };
+  mapPane.addEventListener('touchend', endTouch);
+  mapPane.addEventListener('touchcancel', endTouch);
 }
 
 function init() {
@@ -506,6 +565,7 @@ function init() {
   rebuildClocks();
   rebuildSettingsList();
   initWheel();
+  initTouch();
 
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
   document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);

@@ -116,6 +116,7 @@ html, body {
   height: 100%;
   display: block;
   cursor: pointer;
+  touch-action: none;
 }
 
 #map .sphere { fill: #0d1428; }
@@ -124,13 +125,15 @@ html, body {
 #map .night { fill: #01030a; opacity: 0.55; pointer-events: none; }
 #map .sun { fill: #ffd76a; opacity: 0.9; pointer-events: none; }
 
+#map .city-dot-group { cursor: pointer; }
+#map .city-hit { fill: transparent; pointer-events: all; }
 #map .city-dot {
   fill: var(--text-dim);
   stroke: #06091a;
   stroke-width: 0.5;
-  cursor: pointer;
+  pointer-events: none;
 }
-#map .city-dot:hover { fill: var(--accent-2); r: 4.5; }
+#map .city-dot-group:hover .city-dot { fill: var(--accent-2); r: 4.5; }
 #map .city-dot.active { fill: var(--accent); r: 4.5; }
 #map .city-label {
   fill: var(--text);
