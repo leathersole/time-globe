@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeGlobe — World Meeting Time Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="header">
+    <div class="brand">
+      <span class="brand-globe">🌐</span>
+      <div class="brand-text">
+        <h1>TimeGlobe</h1>
+        <p>World clocks for planning meetings across time zones</p>
+      </div>
+    </div>
+
+    <div class="ref-readout" id="refReadout">
+      <div class="ref-row">
+        <span class="ref-label">Viewing</span>
+        <span class="ref-value" id="refValue">—</span>
+      </div>
+      <div class="ref-row">
+        <span class="offset-pill" id="offsetPill" hidden></span>
+        <button id="resetBtn" class="btn btn-ghost" hidden>Reset to now</button>
+      </div>
+    </div>
+
+    <button id="settingsBtn" class="btn btn-icon" title="Manage locations" aria-label="Open settings">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19.14 12.94a7.07 7.07 0 0 0 .06-.94 7.07 7.07 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.42.32.66.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.24.1.52.02.66-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.56ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>
+      <span>Settings</span>
+    </button>
+  </header>
+
+  <main id="workspace">
+    <section id="mapPane">
+      <div id="mapHint">Click a city dot to add its clock · Scroll anywhere to move every clock by 10 minutes</div>
+      <svg id="map" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"></svg>
+    </section>
+
+    <section id="clocksPane">
+      <div id="clocksEmpty" hidden>
+        <p>No clocks yet.</p>
+        <p>Click a city on the map, or open <strong>Settings</strong> to add a location.</p>
+      </div>
+      <div id="clocksList"></div>
+    </section>
+  </main>
+
+  <div id="settingsOverlay" hidden></div>
+  <aside id="settingsPanel" aria-hidden="true">
+    <div class="settings-header">
+      <h2>Locations</h2>
+      <button id="closeSettingsBtn" class="btn btn-icon" aria-label="Close settings">✕</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>Your clocks</h3>
+      <ul id="activeCityList"></ul>
+    </div>
+
+    <div class="settings-section">
+      <h3>Add a location</h3>
+      <div class="add-city-row">
+        <input id="citySearch" type="text" list="cityOptions" placeholder="Search a city…" autocomplete="off">
+        <datalist id="cityOptions"></datalist>
+        <button id="addCityBtn" class="btn btn-primary">Add</button>
+      </div>
+      <p class="settings-hint">Tip: you can also click any dot on the map to add that city.</p>
+    </div>
+  </aside>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="cities.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
