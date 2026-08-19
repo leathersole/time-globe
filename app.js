@@ -315,10 +315,11 @@ function tickClocks() {
  * Header "reference time" readout
  * ------------------------------------------------------------------ */
 function updateHeader(now) {
+  // Update datetime-local input to reflect current virtual time
   const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const z = getZonedTime(now, localTz);
-  document.getElementById('refValue').textContent =
-    `${z.weekday} ${MONTHS[z.month - 1]} ${pad(z.day)}, ${z.year}  ${pad(z.hour)}:${pad(z.minute)} (your local time)`;
+  const dtValue = `${z.year}-${pad(z.month)}-${pad(z.day)}T${pad(z.hour)}:${pad(z.minute)}`;
+  document.getElementById('datetimeInput').value = dtValue;
 
   const pill = document.getElementById('offsetPill');
   const resetBtn = document.getElementById('resetBtn');
@@ -576,6 +577,24 @@ function init() {
   });
   document.getElementById('resetBtn').addEventListener('click', () => {
     manualBase = null;
+    offsetMinutes = 0;
+    wheelAccum = 0;
+    mainTick();
+  });
+
+  document.getElementById('datetimeInput').addEventListener('change', (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    // datetime-local value is in local time, format: "YYYY-MM-DDTHH:MM"
+    const [datePart, timePart] = val.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Construct a Date in the user's local timezone
+    const targetLocal = new Date(year, month - 1, day, hour, minute, 0, 0);
+    // Round to the nearest 10-minute mark to match the wheel behavior
+    const tenMin = WHEEL_UNIT_MIN * 60000;
+    manualBase = new Date(Math.round(targetLocal.getTime() / tenMin) * tenMin);
     offsetMinutes = 0;
     wheelAccum = 0;
     mainTick();
