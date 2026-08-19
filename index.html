@@ -71,6 +71,15 @@
       </div>
       <p class="settings-hint">Tip: you can also click any dot on the map to add that city.</p>
     </div>
+
+    <div class="settings-section">
+      <h3>Add by UTC offset</h3>
+      <div class="add-city-row">
+        <input id="offsetInput" type="number" min="-12" max="14" step="0.5" placeholder="e.g. 9 or -5.5" autocomplete="off">
+        <button id="addOffsetBtn" class="btn btn-primary">Add</button>
+      </div>
+      <p class="settings-hint">Fixed offset clocks (no DST). Enter hours from UTC, e.g. 9 for UTC+9, -5.5 for UTC-5:30.</p>
+    </div>
   </aside>
 
 </div>

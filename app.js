@@ -73,6 +73,29 @@ function sunPosition(date) {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const pad = n => String(n).padStart(2, '0');
 
+// Custom offset clocks are identified by a key like "offset:+9" or "offset:-5.5"
+function isCustomOffset(tzOrKey) {
+  return typeof tzOrKey === 'string' && tzOrKey.startsWith('offset:');
+}
+
+function parseCustomOffset(key) {
+  // "offset:+9" -> 9, "offset:-5.5" -> -5.5
+  return parseFloat(key.replace('offset:', ''));
+}
+
+function customOffsetKey(offsetHours) {
+  const sign = offsetHours >= 0 ? '+' : '';
+  return `offset:${sign}${offsetHours}`;
+}
+
+function formatCustomOffsetLabel(offsetHours) {
+  const sign = offsetHours >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetHours);
+  const h = Math.floor(abs);
+  const m = Math.round((abs - h) * 60);
+  return `UTC${sign}${h}${m ? ':' + pad(m) : ''}`;
+}
+
 const zonedFormatterCache = new Map();
 function zonedFormatter(tz) {
   let f = zonedFormatterCache.get(tz);
@@ -87,9 +110,22 @@ function zonedFormatter(tz) {
   return f;
 }
 
-function getZonedTime(date, tz) {
+function getZonedTime(date, tzOrKey) {
+  if (isCustomOffset(tzOrKey)) {
+    const offsetHours = parseCustomOffset(tzOrKey);
+    const utc = new Date(date.getTime() + offsetHours * 3600000);
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return {
+      year: utc.getUTCFullYear(),
+      month: utc.getUTCMonth() + 1,
+      day: utc.getUTCDate(),
+      hour: utc.getUTCHours(),
+      minute: utc.getUTCMinutes(),
+      weekday: weekdays[utc.getUTCDay()],
+    };
+  }
   const parts = {};
-  for (const p of zonedFormatter(tz).formatToParts(date)) parts[p.type] = p.value;
+  for (const p of zonedFormatter(tzOrKey).formatToParts(date)) parts[p.type] = p.value;
   return {
     year: +parts.year, month: +parts.month, day: +parts.day,
     hour: +parts.hour, minute: +parts.minute,
@@ -97,8 +133,11 @@ function getZonedTime(date, tz) {
   };
 }
 
-function getUtcOffsetMinutes(date, tz) {
-  const z = getZonedTime(date, tz);
+function getUtcOffsetMinutes(date, tzOrKey) {
+  if (isCustomOffset(tzOrKey)) {
+    return parseCustomOffset(tzOrKey) * 60;
+  }
+  const z = getZonedTime(date, tzOrKey);
   const asUtc = Date.UTC(z.year, z.month - 1, z.day, z.hour, z.minute);
   const flooredNow = Math.floor(date.getTime() / 60000) * 60000;
   return Math.round((asUtc - flooredNow) / 60000);
@@ -162,7 +201,7 @@ function loadSaved() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const arr = JSON.parse(raw).filter(k => cityByKey.has(k));
+    const arr = JSON.parse(raw).filter(k => cityByKey.has(k) || isCustomOffset(k));
     return arr.length ? arr : null;
   } catch (e) { return null; }
 }
@@ -190,6 +229,15 @@ function currentVirtualTime() {
 
 function addCity(city) {
   const key = cityKey(city);
+  addClock(key);
+}
+
+function addCustomOffset(offsetHours) {
+  const key = customOffsetKey(offsetHours);
+  addClock(key);
+}
+
+function addClock(key) {
   if (activeKeys.includes(key)) { flashCard(key); return; }
   activeKeys.push(key);
   persist();
@@ -198,7 +246,7 @@ function addCity(city) {
   updateMapSelection();
 }
 
-function removeCity(key) {
+function removeClock(key) {
   activeKeys = activeKeys.filter(k => k !== key);
   persist();
   rebuildClocks();
@@ -233,15 +281,29 @@ function buildTicksSVG() {
 }
 const TICKS_SVG = buildTicksSVG();
 
-function buildClockCard(city) {
-  const key = cityKey(city);
+function buildClockCard(cityOrKey) {
+  let key, title, subtitle, tzOrKey;
+  if (typeof cityOrKey === 'string' && isCustomOffset(cityOrKey)) {
+    key = cityOrKey;
+    const offsetHours = parseCustomOffset(cityOrKey);
+    title = formatCustomOffsetLabel(offsetHours);
+    subtitle = 'Fixed offset (no DST)';
+    tzOrKey = cityOrKey;
+  } else {
+    const city = cityOrKey;
+    key = cityKey(city);
+    title = city.name;
+    subtitle = city.country;
+    tzOrKey = city.tz;
+  }
+
   const wrap = document.createElement('div');
   wrap.className = 'clock-card';
   wrap.dataset.key = key;
   wrap.innerHTML = `
-    <button class="clock-remove" aria-label="Remove ${city.name}" title="Remove">&#10005;</button>
-    <div class="clock-city">${city.name}</div>
-    <div class="clock-country">${city.country}</div>
+    <button class="clock-remove" aria-label="Remove ${title}" title="Remove">&#10005;</button>
+    <div class="clock-city">${title}</div>
+    <div class="clock-country">${subtitle}</div>
     <div class="clock-face-wrap">
       <svg class="clock-face" viewBox="0 0 100 100">
         <circle class="face" cx="50" cy="50" r="46"></circle>
@@ -258,9 +320,9 @@ function buildClockCard(city) {
       <span class="clock-daybadge" hidden></span>
     </div>
   `;
-  wrap.querySelector('.clock-remove').addEventListener('click', () => removeCity(key));
+  wrap.querySelector('.clock-remove').addEventListener('click', () => removeClock(key));
   return {
-    el: wrap, city,
+    el: wrap, tzOrKey,
     hourHand: wrap.querySelector('.hand-hour'),
     minuteHand: wrap.querySelector('.hand-minute'),
     digital: wrap.querySelector('.clock-digital'),
@@ -283,11 +345,15 @@ function rebuildClocks() {
   empty.hidden = true;
 
   const now = currentVirtualTime();
-  const sorted = [...activeKeys].sort((a, b) =>
-    getUtcOffsetMinutes(now, findCityByKey(a).tz) - getUtcOffsetMinutes(now, findCityByKey(b).tz));
+  const sorted = [...activeKeys].sort((a, b) => {
+    const tzA = isCustomOffset(a) ? a : findCityByKey(a).tz;
+    const tzB = isCustomOffset(b) ? b : findCityByKey(b).tz;
+    return getUtcOffsetMinutes(now, tzA) - getUtcOffsetMinutes(now, tzB);
+  });
 
   for (const key of sorted) {
-    const card = buildClockCard(findCityByKey(key));
+    const cityOrKey = isCustomOffset(key) ? key : findCityByKey(key);
+    const card = buildClockCard(cityOrKey);
     list.appendChild(card.el);
     clockRefs[key] = card;
   }
@@ -299,13 +365,13 @@ function tickClocks() {
   const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   for (const key in clockRefs) {
     const ref = clockRefs[key];
-    const z = getZonedTime(now, ref.city.tz);
+    const z = getZonedTime(now, ref.tzOrKey);
     setHand(ref.hourHand, (z.hour % 12) * 30 + z.minute * 0.5);
     setHand(ref.minuteHand, z.minute * 6);
     ref.digital.textContent = `${pad(z.hour)}:${pad(z.minute)}`;
     ref.dateEl.textContent = `${z.weekday} ${MONTHS[z.month - 1]} ${pad(z.day)}, ${z.year}`;
-    ref.offsetEl.textContent = formatOffsetLabel(getUtcOffsetMinutes(now, ref.city.tz));
-    const dl = dayDiffLabel(now, ref.city.tz, localTz);
+    ref.offsetEl.textContent = formatOffsetLabel(getUtcOffsetMinutes(now, ref.tzOrKey));
+    const dl = dayDiffLabel(now, ref.tzOrKey, localTz);
     ref.dayBadge.hidden = !dl;
     if (dl) ref.dayBadge.textContent = dl;
   }
@@ -422,7 +488,7 @@ function updateMapSelection() {
   if (!mapState) return;
   mapState.dots.classed('active', d => activeKeys.includes(cityKey(d)));
 
-  const activeCities = activeKeys.map(findCityByKey);
+  const activeCities = activeKeys.filter(k => !isCustomOffset(k)).map(findCityByKey);
   const sel = mapState.labelsG.selectAll('text.city-label').data(activeCities, cityKey);
   sel.exit().remove();
   sel.enter().append('text').attr('class', 'city-label')
@@ -444,16 +510,27 @@ function rebuildSettingsList() {
   }
   const now = currentVirtualTime();
   for (const key of activeKeys) {
-    const city = findCityByKey(key);
+    let name, subtitle, tzOrKey;
+    if (isCustomOffset(key)) {
+      const offsetHours = parseCustomOffset(key);
+      name = formatCustomOffsetLabel(offsetHours);
+      subtitle = 'Fixed offset';
+      tzOrKey = key;
+    } else {
+      const city = findCityByKey(key);
+      name = `${city.name}, ${city.country}`;
+      subtitle = formatOffsetLabel(getUtcOffsetMinutes(now, city.tz));
+      tzOrKey = city.tz;
+    }
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="li-info">
-        <span>${city.name}, ${city.country}</span>
-        <span class="li-offset">${formatOffsetLabel(getUtcOffsetMinutes(now, city.tz))}</span>
+        <span>${name}</span>
+        <span class="li-offset">${subtitle}</span>
       </div>
-      <button aria-label="Remove ${city.name}" title="Remove">&#10005;</button>
+      <button aria-label="Remove ${name}" title="Remove">&#10005;</button>
     `;
-    li.querySelector('button').addEventListener('click', () => removeCity(key));
+    li.querySelector('button').addEventListener('click', () => removeClock(key));
     ul.appendChild(li);
   }
 }
@@ -588,6 +665,22 @@ function init() {
   document.getElementById('addCityBtn').addEventListener('click', tryAddFromSearch);
   document.getElementById('citySearch').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') tryAddFromSearch();
+  });
+
+  function tryAddOffset() {
+    const input = document.getElementById('offsetInput');
+    const val = parseFloat(input.value);
+    if (isNaN(val) || val < -12 || val > 14) {
+      input.classList.add('input-error');
+      setTimeout(() => input.classList.remove('input-error'), 600);
+      return;
+    }
+    addCustomOffset(val);
+    input.value = '';
+  }
+  document.getElementById('addOffsetBtn').addEventListener('click', tryAddOffset);
+  document.getElementById('offsetInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') tryAddOffset();
   });
   document.getElementById('resetBtn').addEventListener('click', () => {
     manualBase = null;
