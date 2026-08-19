@@ -100,7 +100,8 @@ function getZonedTime(date, tz) {
 function getUtcOffsetMinutes(date, tz) {
   const z = getZonedTime(date, tz);
   const asUtc = Date.UTC(z.year, z.month - 1, z.day, z.hour, z.minute);
-  return Math.round((asUtc - date.getTime()) / 60000);
+  const flooredNow = Math.floor(date.getTime() / 60000) * 60000;
+  return Math.round((asUtc - flooredNow) / 60000);
 }
 
 function formatOffsetLabel(mins) {
