@@ -441,17 +441,40 @@ async function initMap() {
   const projection = d3.geoNaturalEarth1().fitExtent([[8, 8], [width - 8, height - 8]], { type: 'Sphere' });
   const path = d3.geoPath(projection);
 
-  svg.append('path').datum({ type: 'Sphere' }).attr('class', 'sphere').attr('d', path);
-  svg.append('path').datum(d3.geoGraticule().step([30, 30])()).attr('class', 'graticule').attr('d', path);
+  // Group all zoomable map elements together
+  const zoomGroup = svg.append('g').attr('class', 'zoom-group');
 
-  const landPath = svg.append('path').attr('class', 'land');
-  const nightPath = svg.append('path').attr('class', 'night');
-  const sunCircle = svg.append('circle').attr('class', 'sun').attr('r', 6);
+  zoomGroup.append('path').datum({ type: 'Sphere' }).attr('class', 'sphere').attr('d', path);
+  zoomGroup.append('path').datum(d3.geoGraticule().step([30, 30])()).attr('class', 'graticule').attr('d', path);
 
-  const dotsG = svg.append('g').attr('class', 'dots');
-  const labelsG = svg.append('g').attr('class', 'labels');
+  const landPath = zoomGroup.append('path').attr('class', 'land');
+  const nightPath = zoomGroup.append('path').attr('class', 'night');
+  const sunCircle = zoomGroup.append('circle').attr('class', 'sun').attr('r', 6);
 
-  mapState = { projection, path, nightPath, sunCircle, dotsG, labelsG };
+  const dotsG = zoomGroup.append('g').attr('class', 'dots');
+  const labelsG = zoomGroup.append('g').attr('class', 'labels');
+
+  // Setup zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([1, 8])
+    .on('zoom', (event) => {
+      zoomGroup.attr('transform', event.transform);
+    })
+    .filter((event) => {
+      // Allow zoom/pan only with:
+      // - 2+ finger touches (pinch/pan on mobile)
+      // - Ctrl/Cmd + wheel or drag on desktop
+      // - Double-click/tap to zoom in
+      const isTouchMultiFinger = event.type === 'touchstart' && event.touches && event.touches.length >= 2;
+      const isCtrlWheel = event.type === 'wheel' && (event.ctrlKey || event.metaKey);
+      const isCtrlDrag = event.type === 'mousedown' && (event.ctrlKey || event.metaKey);
+      const isDblClick = event.type === 'dblclick';
+      return isTouchMultiFinger || isCtrlWheel || isCtrlDrag || isDblClick;
+    });
+
+  svg.call(zoom);
+
+  mapState = { projection, path, nightPath, sunCircle, dotsG, labelsG, svg, zoom, zoomGroup };
 
   svg.select('.sphere').on('click', (event) => {
     const [x, y] = d3.pointer(event, svg.node());
@@ -704,6 +727,10 @@ function init() {
     offsetMinutes = 0;
     wheelAccum = 0;
     mainTick();
+    // Reset map zoom
+    if (mapState && mapState.svg && mapState.zoom) {
+      mapState.svg.transition().duration(750).call(mapState.zoom.transform, d3.zoomIdentity);
+    }
   });
 
   const invertCheck = document.getElementById('invertScrollCheck');
