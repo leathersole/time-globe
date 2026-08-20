@@ -295,6 +295,25 @@ html, body {
 }
 .settings-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
 
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.settings-checkbox:hover { border-color: var(--accent); }
+.settings-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
 .add-city-row input.input-error { border-color: var(--danger); }
 
 .clock-card.flash { animation: flash-pulse 0.5s ease; }

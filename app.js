@@ -186,7 +186,9 @@ function findNearestCity(lon, lat) {
  * Application state
  * ------------------------------------------------------------------ */
 const STORAGE_KEY = 'timeglobe.clocks';
+const INVERT_SCROLL_KEY = 'timeglobe.invertScroll';
 let activeKeys = loadSaved() || defaultCities();
+let invertScroll = loadInvertScroll();
 
 // While `manualBase` is null the app shows the real live time. Once the user
 // scrolls, time freezes at `manualBase` (rounded to a clean 10-minute mark)
@@ -204,6 +206,19 @@ function loadSaved() {
     const arr = JSON.parse(raw).filter(k => cityByKey.has(k) || isCustomOffset(k));
     return arr.length ? arr : null;
   } catch (e) { return null; }
+}
+
+function loadInvertScroll() {
+  try {
+    return localStorage.getItem(INVERT_SCROLL_KEY) === 'true';
+  } catch (e) { return false; }
+}
+
+function setInvertScroll(value) {
+  invertScroll = value;
+  try {
+    localStorage.setItem(INVERT_SCROLL_KEY, String(value));
+  } catch (e) {}
 }
 
 function defaultCities() {
@@ -604,7 +619,8 @@ function initWheel() {
   document.getElementById('workspace').addEventListener('wheel', (e) => {
     e.preventDefault();
     ensureManualBase();
-    wheelAccum = consumeDelta(wheelAccum, normalizedDeltaY(e), WHEEL_THRESHOLD);
+    const multiplier = invertScroll ? -1 : 1;
+    wheelAccum = consumeDelta(wheelAccum, normalizedDeltaY(e) * multiplier, WHEEL_THRESHOLD);
     mainTick();
   }, { passive: false });
 }
@@ -641,7 +657,8 @@ function initTouch() {
     if (dragging && verticalDrag) {
       e.preventDefault();
       ensureManualBase();
-      touchAccum = consumeDelta(touchAccum, lastY - y, TOUCH_PX_PER_STEP);
+      const multiplier = invertScroll ? -1 : 1;
+      touchAccum = consumeDelta(touchAccum, (lastY - y) * multiplier, TOUCH_PX_PER_STEP);
       lastY = y;
       mainTick();
     }
@@ -687,6 +704,12 @@ function init() {
     offsetMinutes = 0;
     wheelAccum = 0;
     mainTick();
+  });
+
+  const invertCheck = document.getElementById('invertScrollCheck');
+  invertCheck.checked = invertScroll;
+  invertCheck.addEventListener('change', (e) => {
+    setInvertScroll(e.target.checked);
   });
 
   document.getElementById('datetimeInput').addEventListener('change', (e) => {
