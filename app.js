@@ -160,6 +160,26 @@ function dayDiffLabel(date, tz, localTz) {
   return diff > 0 ? `+${diff}d` : `${diff}d`;
 }
 
+function isDST(date, tzOrKey) {
+  if (isCustomOffset(tzOrKey)) return false; // Custom offsets have no DST
+
+  // Compare offsets in January (winter) and July (summer)
+  const year = date.getFullYear();
+  const jan = new Date(year, 0, 1, 12, 0, 0);
+  const jul = new Date(year, 6, 1, 12, 0, 0);
+
+  const janOffset = getUtcOffsetMinutes(jan, tzOrKey);
+  const julOffset = getUtcOffsetMinutes(jul, tzOrKey);
+  const currentOffset = getUtcOffsetMinutes(date, tzOrKey);
+
+  // If jan and jul offsets are the same, no DST in this zone
+  if (janOffset === julOffset) return false;
+
+  // DST is when offset is greater (further from UTC) than standard time
+  const maxOffset = Math.max(janOffset, julOffset);
+  return currentOffset === maxOffset;
+}
+
 /* ------------------------------------------------------------------ *
  * City lookup helpers
  * ------------------------------------------------------------------ */
@@ -327,12 +347,14 @@ function buildClockCard(cityOrKey) {
         <line class="hand-minute" x1="50" y1="50" x2="50" y2="17"></line>
         <circle class="pivot" cx="50" cy="50" r="2.4"></circle>
       </svg>
+      <div class="clock-ampm"></div>
     </div>
     <div class="clock-digital"></div>
     <div class="clock-date"></div>
     <div class="clock-meta">
       <span class="clock-offset"></span>
       <span class="clock-daybadge" hidden></span>
+      <span class="clock-dst" hidden title="Daylight Saving Time">DST</span>
     </div>
   `;
   wrap.querySelector('.clock-remove').addEventListener('click', () => removeClock(key));
@@ -344,6 +366,8 @@ function buildClockCard(cityOrKey) {
     dateEl: wrap.querySelector('.clock-date'),
     offsetEl: wrap.querySelector('.clock-offset'),
     dayBadge: wrap.querySelector('.clock-daybadge'),
+    ampmEl: wrap.querySelector('.clock-ampm'),
+    dstBadge: wrap.querySelector('.clock-dst'),
   };
 }
 
@@ -386,9 +410,18 @@ function tickClocks() {
     ref.digital.textContent = `${pad(z.hour)}:${pad(z.minute)}`;
     ref.dateEl.textContent = `${z.weekday} ${MONTHS[z.month - 1]} ${pad(z.day)}, ${z.year}`;
     ref.offsetEl.textContent = formatOffsetLabel(getUtcOffsetMinutes(now, ref.tzOrKey));
+
+    // AM/PM indicator
+    ref.ampmEl.textContent = z.hour >= 12 ? 'PM' : 'AM';
+
+    // Day difference badge
     const dl = dayDiffLabel(now, ref.tzOrKey, localTz);
     ref.dayBadge.hidden = !dl;
     if (dl) ref.dayBadge.textContent = dl;
+
+    // DST badge
+    const inDST = isDST(now, ref.tzOrKey);
+    ref.dstBadge.hidden = !inDST;
   }
 }
 
