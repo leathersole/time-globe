@@ -8,6 +8,7 @@ A browser-based world clock app for picking meeting times across time zones — 
 
 - World map (with country borders) showing a live day/night terminator
 - Click or tap a city on the map to add its clock; add as many as you need
+- **Zoom and pan the map**: Ctrl/Cmd+wheel or pinch (2 fingers) to zoom 1x–8x; especially useful on small screens to select precise locations
 - Each clock shows an analog face (hour/minute hands) plus a digital date, time, UTC offset, and a "+1d/-1d" badge when the city is on a different calendar day
 - Time zones are resolved from the IANA time zone database, so daylight saving time is handled automatically
 - Use the mouse wheel (or drag vertically on the map on touch devices) to shift every clock together in 10-minute steps; the day/night shading moves with it
@@ -46,16 +47,26 @@ Then open `http://localhost:8000` in your browser.
 
 ## Usage
 
-- Click/tap a city dot on the map to add its clock
-- Click/tap an empty spot on the map to add the nearest city's clock
-- Use the mouse wheel, or drag vertically on the map, to move every clock by 10-minute steps (day/night shading moves too)
-- Horizontal drags are reserved for scrolling the clock list, so they don't affect the time
-- Click the datetime picker in the header to jump to a specific date and time
-- Open **Settings** (top right) to:
-  - Remove clocks or add one by searching for a city name
-  - Add a custom UTC offset clock (e.g., UTC+9 or UTC-5:30) without DST
-  - Toggle **Invert scroll direction** to reverse mouse wheel / drag behavior
-- **Reset to now** returns to the live current time
+### Map interaction
+
+- **Add a clock**: Click/tap a city dot, or click/tap an empty spot to add the nearest city
+- **Zoom the map** (desktop): Hold Ctrl/Cmd and scroll the mouse wheel, or double-click
+- **Zoom the map** (mobile): Pinch with 2 fingers
+- **Pan the map** (desktop): Hold Ctrl/Cmd and drag
+- **Pan the map** (mobile): Drag with 2 fingers
+
+### Time travel
+
+- **Scroll time**: Use the mouse wheel (desktop) or drag vertically with 1 finger (mobile) to move every clock by 10-minute steps (day/night shading moves too)
+- **Jump to a date**: Click the datetime picker in the header to jump to a specific date and time
+- **Reset**: Click **Reset to now** to return to the live current time and reset map zoom
+
+### Settings
+
+Open **Settings** (top right) to:
+- Remove clocks or add one by searching for a city name
+- Add a custom UTC offset clock (e.g., UTC+9 or UTC-5:30) without DST
+- Toggle **Invert scroll direction** to reverse mouse wheel / drag behavior
 
 ## Deployment
 
